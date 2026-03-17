@@ -1,7 +1,7 @@
 # Docker image to deploy.
 image:
   # Container registry/repository that contains clue-arena-app.
-  repository: ghcr.io/your-org/clue-arena-app
+  repository: ghcr.io/your-org/clue-arena
   # Application image tag. Leave empty to use Chart.appVersion.
   tag: ""
   # Kubernetes pull policy for the app image.
