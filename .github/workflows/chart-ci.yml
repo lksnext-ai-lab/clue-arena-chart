@@ -48,17 +48,12 @@ jobs:
       - name: Create kind cluster
         uses: helm/kind-action@v1.12.0
 
-      - name: Prepare chart-testing install values
+      - name: Prepare chart-testing values
         run: |
-          cp ci/ct-values.yaml /tmp/ct-values.yaml
-          cat <<EOF >> /tmp/ct-values.yaml
-          image:
-            repository: ghcr.io/${{ github.repository_owner }}/clue-arena-app
-            tag: dev
-          EOF
+          sed -i "s|__GITHUB_OWNER__|${{ github.repository_owner }}|g" ci/ct-values.yaml
 
       - name: Run chart-testing install
-        run: ct install --config ct.yaml --charts . 
+        run: ct install --config ct.yaml --charts .
 
       - name: Dump cluster state on failure
         if: failure()
