@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/__GITHUB_OWNER__/clue-arena-app
+  repository: ghcr.io/__GITHUB_OWNER__/clue-arena
   tag: dev
 
 app:
