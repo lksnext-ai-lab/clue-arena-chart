@@ -58,7 +58,7 @@ jobs:
           EOF
 
       - name: Run chart-testing install
-        run: ct install --config ct.yaml --charts . --helm-extra-values /tmp/ct-values.yaml
+        run: ct install --config ct.yaml --charts . 
 
       - name: Dump cluster state on failure
         if: failure()
