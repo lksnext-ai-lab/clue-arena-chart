@@ -35,6 +35,8 @@ jobs:
     permissions:
       contents: read
       packages: read
+    env:
+      IMAGE_REF: ghcr.io/${{ github.repository_owner }}/clue-arena:dev
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -51,6 +53,19 @@ jobs:
       - name: Prepare chart-testing values
         run: |
           sed -i "s|__GITHUB_OWNER__|${{ github.repository_owner }}|g" ci/ct-values.yaml
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull application image
+        run: docker pull "$IMAGE_REF"
+
+      - name: Load image into kind
+        run: kind load docker-image "$IMAGE_REF"
 
       - name: Run chart-testing install
         run: ct install --config ct.yaml --charts .
