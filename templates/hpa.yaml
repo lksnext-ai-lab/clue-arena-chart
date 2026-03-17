@@ -1,0 +1,4 @@
+{{/*
+Autoscaling is intentionally not exposed in values.yaml for this chart.
+Clue Arena currently defaults to a single writable SQLite-backed replica.
+*/}}

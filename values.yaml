@@ -1,0 +1,103 @@
+# Docker image to deploy.
+image:
+  # Container registry/repository that contains clue-arena-app.
+  repository: ghcr.io/your-org/clue-arena-app
+  # Application image tag. Leave empty to use Chart.appVersion.
+  tag: ""
+  # Kubernetes pull policy for the app image.
+  pullPolicy: IfNotPresent
+
+# Public access settings for the application.
+exposure:
+  # Set to true to create an Ingress.
+  enabled: false
+  # Public DNS name used by the Ingress.
+  host: clue-arena.local
+  # Optional ingress class name, for example nginx or traefik.
+  ingressClassName: ""
+  tls:
+    # Set to true when the ingress should terminate TLS.
+    enabled: false
+    # Existing TLS secret that contains the certificate for the public host.
+    secretName: ""
+
+# Clue Arena application configuration.
+app:
+  # Public browser URL. Leave empty to auto-build it from exposure.host when ingress is enabled.
+  publicUrl: ""
+  # Optional explicit websocket URL. Leave empty to let the frontend derive it automatically.
+  websocketUrl: ""
+  # Application log level.
+  logLevel: info
+  # First user that signs in with this email becomes admin if not already present.
+  bootstrapAdminEmail: ""
+
+  auth:
+    # Set to true only for local/demo environments without real sign-in.
+    disableAuth: false
+    # Enables demo initialization flows while keeping the app in production mode.
+    demoMode: false
+    # Recommended true when running behind an ingress or reverse proxy.
+    trustHost: true
+    # Secret used by Auth.js to sign sessions.
+    authSecret: ""
+    # Login providers shown in the UI. Example: password or password,google.com
+    firebaseAuthProviders: password
+    firebaseClient:
+      # Firebase web SDK API key.
+      apiKey: ""
+      # Firebase Auth domain.
+      authDomain: ""
+      # Firebase project id exposed to the browser.
+      projectId: ""
+      # Firebase web app id.
+      appId: ""
+      # Optional Firebase messaging sender id.
+      messagingSenderId: ""
+      # Optional Firebase storage bucket.
+      storageBucket: ""
+    firebaseAdmin:
+      # Firebase project id used by the admin SDK.
+      projectId: ""
+      # Firebase service account email.
+      clientEmail: ""
+      # Firebase service account private key. Keep line breaks escaped as \n in plain YAML.
+      privateKey: ""
+
+  mcp:
+    # Bearer token required by the incoming MCP endpoint.
+    authToken: ""
+
+  agents:
+    # Supported backends today: local or mattin.
+    backend: local
+    # Model name used when backend=local.
+    genkitModel: googleai/gemini-2.5-flash
+    # API key required by Google-backed Genkit models.
+    geminiApiKey: ""
+    mattin:
+      # Base URL for the MattinAI API when backend=mattin.
+      apiUrl: ""
+      # API key for MattinAI.
+      apiKey: ""
+
+  websocket:
+    # Maximum concurrent websocket connections allowed per session.
+    maxConnectionsPerSession: 5
+    # Heartbeat interval in milliseconds.
+    heartbeatIntervalMs: 30000
+
+  database:
+    # SQLite filename created inside the mounted data directory.
+    filename: clue-arena.db
+    # Set to true to skip the startup migration step.
+    skipMigrations: false
+    persistence:
+      # Keep enabled for any environment where data must survive pod restarts.
+      enabled: true
+      # Reuse an existing PVC instead of creating one.
+      existingClaim: ""
+      # Requested persistent volume size.
+      size: 5Gi
+      # Optional storage class name. Leave empty to use the cluster default.
+      storageClassName: ""

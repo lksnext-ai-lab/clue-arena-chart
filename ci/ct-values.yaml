@@ -1,0 +1,10 @@
+app:
+  publicUrl: http://clue-arena.local
+  auth:
+    disableAuth: true
+    authSecret: ci-auth-secret
+  mcp:
+    authToken: ci-mcp-token
+  database:
+    persistence:
+      enabled: false

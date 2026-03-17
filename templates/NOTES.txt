@@ -1,0 +1,13 @@
+1. Get the application URL by running these commands:
+{{- if .Values.exposure.enabled }}
+  {{ include "clue-arena-app.publicUrl" . }}
+{{- else }}
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "clue-arena-app.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 3000:$CONTAINER_PORT
+  echo "Visit http://127.0.0.1:3000"
+{{- end }}
+
+2. Verify that your image was built with the same NEXT_PUBLIC_* values you expect in production.
+
+3. If you keep SQLite enabled, stay on a single writable replica unless you redesign persistence.

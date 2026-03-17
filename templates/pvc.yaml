@@ -1,0 +1,17 @@
+{{- if and .Values.app.database.persistence.enabled (not .Values.app.database.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "clue-arena-app.fullname" . }}
+  labels:
+    {{- include "clue-arena-app.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.app.database.persistence.size | quote }}
+  {{- if .Values.app.database.persistence.storageClassName }}
+  storageClassName: {{ .Values.app.database.persistence.storageClassName | quote }}
+  {{- end }}
+{{- end }}

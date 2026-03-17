@@ -1,0 +1,67 @@
+name: Chart CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: chart-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint Chart
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.7.0
+
+      - name: Run chart-testing lint
+        run: ct lint --config ct.yaml --charts .
+
+  install:
+    name: Install In Kind
+    runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.7.0
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.12.0
+
+      - name: Prepare chart-testing install values
+        run: |
+          cp ci/ct-values.yaml /tmp/ct-values.yaml
+          cat <<EOF >> /tmp/ct-values.yaml
+          image:
+            repository: ghcr.io/${{ github.repository_owner }}/clue-arena-app
+            tag: dev
+          EOF
+
+      - name: Run chart-testing install
+        run: ct install --config ct.yaml --charts . --helm-extra-values /tmp/ct-values.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          kubectl get pods,svc,deploy,pvc --all-namespaces -o wide
+          kubectl describe pods --all-namespaces
