@@ -182,3 +182,14 @@ The repository CI currently runs:
 - `ct lint --config ct.yaml --charts .`
 - `ct install --config ct.yaml --charts .`
 - `helm test` on a Kind-installed release using [`ci/ct-values.yaml`](/home/jjrodrig/projects/cluedo-workspace/clue-arena-chart/ci/ct-values.yaml)
+
+## Releases
+
+The repository includes a release workflow at [`.github/workflows/release.yml`](/home/jjrodrig/projects/cluedo-workspace/clue-arena-chart/.github/workflows/release.yml).
+
+It supports two entry points:
+
+- Manual `workflow_dispatch`, where you provide the release version and optionally the application image repository.
+- Automatic `repository_dispatch` from the app repository after a successful application release.
+
+During a chart release, the workflow updates `Chart.yaml` to the requested version, validates the chart against the released application image, packages the chart, tags the repository, and creates a GitHub Release with the packaged chart attached.

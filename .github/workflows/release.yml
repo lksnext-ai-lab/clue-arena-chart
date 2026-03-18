@@ -1,0 +1,226 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version in semver format, for example 1.2.3
+        required: true
+        type: string
+      image_repository:
+        description: Optional application image repository override
+        required: false
+        type: string
+  repository_dispatch:
+    types:
+      - app-released
+
+concurrency:
+  group: chart-release-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    env:
+      DEFAULT_IMAGE_REPOSITORY: ghcr.io/${{ github.repository_owner }}/clue-arena
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref_name || github.event.repository.default_branch }}
+
+      - name: Ensure release runs from the default branch
+        run: |
+          current_branch="$(git branch --show-current)"
+          if [ "$current_branch" != "${{ github.event.repository.default_branch }}" ]; then
+            echo "Releases must be created from ${{ github.event.repository.default_branch }}"
+            exit 1
+          fi
+
+      - name: Resolve release metadata
+        id: release
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DEFAULT_IMAGE_REPOSITORY: ${{ env.DEFAULT_IMAGE_REPOSITORY }}
+          RAW_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.event.client_payload.version }}
+          RAW_IMAGE_REPOSITORY: ${{ github.event_name == 'workflow_dispatch' && inputs.image_repository || github.event.client_payload.image_repository }}
+        run: |
+          version="${RAW_VERSION#v}"
+          image_repository="$RAW_IMAGE_REPOSITORY"
+
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Version must be a valid semver value such as 1.2.3"
+            exit 1
+          fi
+
+          if [ -z "$image_repository" ]; then
+            image_repository="$DEFAULT_IMAGE_REPOSITORY"
+          fi
+
+          prerelease=false
+          if [[ "$version" == *-* ]]; then
+            prerelease=true
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "image_repository=$image_repository" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+      - name: Capture target branch
+        id: branch
+        run: echo "name=$(git branch --show-current)" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if the release tag already exists
+        env:
+          TAG_NAME: ${{ steps.release.outputs.tag }}
+        run: |
+          git fetch --tags --force
+
+          if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Tag $TAG_NAME already exists"
+            exit 1
+          fi
+
+      - name: Update release files
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["VERSION"]
+
+          chart = Path("Chart.yaml")
+          chart_text = chart.read_text()
+          chart_text = re.sub(r"^version: .*$", f"version: {version}", chart_text, count=1, flags=re.MULTILINE)
+          chart_text = re.sub(r'^appVersion: ".*"$', f'appVersion: "{version}"', chart_text, count=1, flags=re.MULTILINE)
+          chart.write_text(chart_text)
+
+          readme = Path("README.md")
+          readme_text = readme.read_text()
+          readme_text = re.sub(r"- Chart version: `[^`]+`", f"- Chart version: `{version}`", readme_text, count=1)
+          readme_text = re.sub(r"- App version: `[^`]+`", f"- App version: `{version}`", readme_text, count=1)
+          readme.write_text(readme_text)
+          PY
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.3.1
+
+      - name: Install helm-unittest plugin
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest --verify=false
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.7.0
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.14.0
+        with:
+          cluster_name: chart-release
+
+      - name: Prepare release values
+        env:
+          IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python <<'PY'
+          import os
+          from pathlib import Path
+
+          image_repository = os.environ["IMAGE_REPOSITORY"]
+          version = os.environ["VERSION"]
+
+          values = Path("ci/ct-values.yaml")
+          lines = values.read_text().splitlines()
+          output = []
+          for line in lines:
+            stripped = line.strip()
+            if stripped.startswith("repository:"):
+              output.append(f"  repository: {image_repository}")
+            elif stripped.startswith("tag:"):
+              output.append(f"  tag: {version}")
+            else:
+              output.append(line)
+          values.write_text("\n".join(output) + "\n")
+          PY
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull application image
+        env:
+          IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: docker pull "${IMAGE_REPOSITORY}:${VERSION}"
+
+      - name: Load image into kind
+        env:
+          IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: kind load docker-image "${IMAGE_REPOSITORY}:${VERSION}" --name chart-release
+
+      - name: Run helm-unittest suite
+        run: helm unittest .
+
+      - name: Run chart-testing lint
+        run: ct lint --config ct.yaml --charts .
+
+      - name: Run chart-testing install
+        run: ct install --config ct.yaml --charts .
+
+      - name: Run helm test
+        run: |
+          helm install clue-arena . \
+            --namespace clue-arena-release \
+            --create-namespace \
+            --values ci/ct-values.yaml \
+            --wait \
+            --timeout 5m
+          helm test clue-arena --namespace clue-arena-release --logs --timeout 5m
+
+      - name: Package chart
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: helm package . --destination dist
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit release version
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG_NAME: ${{ steps.release.outputs.tag }}
+        run: |
+          git add Chart.yaml README.md
+          git commit -m "Release v$VERSION"
+          git tag "$TAG_NAME"
+
+      - name: Push release commit and tag
+        env:
+          BRANCH_NAME: ${{ steps.branch.outputs.name }}
+          TAG_NAME: ${{ steps.release.outputs.tag }}
+        run: |
+          git push origin "HEAD:$BRANCH_NAME"
+          git push origin "$TAG_NAME"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: clue-arena-chart v${{ steps.release.outputs.version }}
+          generate_release_notes: true
+          prerelease: ${{ steps.release.outputs.prerelease == 'true' }}
+          files: dist/clue-arena-app-${{ steps.release.outputs.version }}.tgz
