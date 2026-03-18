@@ -9,6 +9,3 @@ app:
     authSecret: ci-auth-secret
   mcp:
     authToken: ci-mcp-token
-  database:
-    persistence:
-      enabled: false
