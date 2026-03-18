@@ -1,0 +1,28 @@
+suite: pvc
+templates:
+  - templates/pvc.yaml
+
+tests:
+  - it: creates a persistent volume claim by default
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PersistentVolumeClaim
+      - equal:
+          path: spec.resources.requests.storage
+          value: 5Gi
+
+  - it: does not create a persistent volume claim when persistence is disabled
+    set:
+      app.database.persistence.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: does not create a persistent volume claim when reusing an existing claim
+    set:
+      app.database.persistence.existingClaim: existing-data
+    asserts:
+      - hasDocuments:
+          count: 0

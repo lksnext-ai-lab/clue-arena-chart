@@ -1,0 +1,52 @@
+suite: deployment
+templates:
+  - templates/deployment.yaml
+
+tests:
+  - it: renders the default deployment with persistent storage mounted
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: RELEASE-NAME-clue-arena-app
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: ghcr.io/your-org/clue-arena:0.1.0
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          value: RELEASE-NAME-clue-arena-app-config
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: RELEASE-NAME-clue-arena-app
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /app/data
+
+  - it: omits persistence resources when database persistence is disabled
+    set:
+      app.database.persistence.enabled: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.volumes
+      - notExists:
+          path: spec.template.spec.containers[0].volumeMounts
+
+  - it: reuses an existing persistent volume claim when configured
+    set:
+      app.database.persistence.existingClaim: existing-data
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].persistentVolumeClaim.claimName
+          value: existing-data
+
+  - it: injects the secret as an envFrom source when secret values are provided
+    set:
+      app.auth.authSecret: super-secret
+      app.mcp.authToken: mcp-token
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[1].secretRef.name
+          value: RELEASE-NAME-clue-arena-app-secret

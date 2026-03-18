@@ -1,0 +1,34 @@
+suite: ingress
+templates:
+  - templates/ingress.yaml
+
+tests:
+  - it: does not render an ingress by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders an ingress with class and TLS settings when exposure is enabled
+    set:
+      exposure.enabled: true
+      exposure.host: clue.example.com
+      exposure.ingressClassName: nginx
+      exposure.tls.enabled: true
+      exposure.tls.secretName: clue-example-tls
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+      - equal:
+          path: spec.rules[0].host
+          value: clue.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-clue-arena-app
+      - equal:
+          path: spec.tls[0].secretName
+          value: clue-example-tls

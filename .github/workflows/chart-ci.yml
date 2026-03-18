@@ -22,6 +22,12 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v4.3.1
 
+      - name: Install helm-unittest plugin
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest
+
+      - name: Run helm-unittest suite
+        run: helm unittest .
+
       - name: Set up chart-testing
         uses: helm/chart-testing-action@v2.7.0
 
@@ -75,3 +81,57 @@ jobs:
         run: |
           kubectl get pods,svc,deploy,pvc --all-namespaces -o wide
           kubectl describe pods --all-namespaces
+
+  runtime-test:
+    name: Helm Test In Kind
+    runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.3.1
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.14.0
+        with:
+          cluster_name: chart-testing
+
+      - name: Prepare chart-testing values
+        run: |
+          sed -i "s|__GITHUB_OWNER__|${{ github.repository_owner }}|g" ci/ct-values.yaml
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull application image
+        run: docker pull ghcr.io/${{ github.repository_owner }}/clue-arena:dev
+
+      - name: Load image into kind
+        run: kind load docker-image ghcr.io/${{ github.repository_owner }}/clue-arena:dev --name chart-testing
+
+      - name: Install chart and wait for rollout
+        run: |
+          helm install clue-arena . \
+            --namespace clue-arena-ci \
+            --create-namespace \
+            --values ci/ct-values.yaml \
+            --wait \
+            --timeout 5m
+
+      - name: Run helm test
+        run: helm test clue-arena --namespace clue-arena-ci --logs --timeout 5m
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          kubectl get pods,svc,deploy,pvc -n clue-arena-ci -o wide
+          kubectl describe pods -n clue-arena-ci

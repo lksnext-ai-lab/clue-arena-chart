@@ -1,0 +1,33 @@
+suite: configmap
+templates:
+  - templates/configmap.yaml
+
+tests:
+  - it: renders default application configuration
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: data.DATABASE_URL
+          value: /app/data/clue-arena.db
+      - equal:
+          path: data.NEXT_PUBLIC_APP_URL
+          value: ""
+      - equal:
+          path: data.NEXT_PUBLIC_DISABLE_AUTH
+          value: "false"
+      - equal:
+          path: data.AGENT_BACKEND
+          value: local
+
+  - it: builds the public URL from ingress settings when app.publicUrl is empty
+    set:
+      exposure.enabled: true
+      exposure.host: arena.example.com
+      exposure.tls.enabled: true
+    asserts:
+      - equal:
+          path: data.NEXT_PUBLIC_APP_URL
+          value: https://arena.example.com

@@ -1,0 +1,23 @@
+suite: test-connection
+templates:
+  - templates/tests/test-connection.yaml
+
+tests:
+  - it: renders a helm test pod that checks the health endpoint through the service
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Pod
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: test
+      - equal:
+          path: spec.restartPolicy
+          value: Never
+      - equal:
+          path: spec.containers[0].image
+          value: busybox:1.36.1
+      - equal:
+          path: spec.containers[0].command[2]
+          value: wget -qO- http://RELEASE-NAME-clue-arena-app:3000/api/health
