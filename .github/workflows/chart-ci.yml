@@ -47,6 +47,8 @@ jobs:
 
       - name: Create kind cluster
         uses: helm/kind-action@v1.14.0
+        with:
+          cluster_name: chart-testing
 
       - name: Prepare chart-testing values
         run: |
@@ -63,7 +65,7 @@ jobs:
         run: docker pull ghcr.io/${{ github.repository_owner }}/clue-arena:dev
 
       - name: Load image into kind
-        run: kind load docker-image ghcr.io/${{ github.repository_owner }}/clue-arena:dev
+        run: kind load docker-image ghcr.io/${{ github.repository_owner }}/clue-arena:dev --name chart-testing
 
       - name: Run chart-testing install
         run: ct install --config ct.yaml --charts .
