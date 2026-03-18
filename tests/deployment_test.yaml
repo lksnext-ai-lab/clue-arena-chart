@@ -4,6 +4,8 @@ templates:
 
 tests:
   - it: renders the default deployment with persistent storage mounted
+    set:
+      image.tag: "0.1.0"
     asserts:
       - hasDocuments:
           count: 1
