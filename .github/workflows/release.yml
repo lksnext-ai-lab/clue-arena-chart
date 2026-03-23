@@ -252,7 +252,13 @@ jobs:
           TAG_NAME: ${{ steps.release.outputs.tag }}
         run: |
           git add Chart.yaml README.md
-          git commit -m "Release v$VERSION"
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Release v$VERSION"
+          else
+            echo "Release files already match v$VERSION; skipping commit."
+          fi
+
           git tag "$TAG_NAME"
 
       - name: Push release commit and tag
