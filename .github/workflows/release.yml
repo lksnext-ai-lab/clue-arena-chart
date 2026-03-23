@@ -5,12 +5,17 @@ on:
     inputs:
       version:
         description: Release version in semver format, for example 1.2.3
-        required: true
+        required: false
         type: string
       image_repository:
         description: Optional application image repository override
         required: false
         type: string
+      republish_last_version:
+        description: Republish the latest released chart into gh-pages without creating a new release
+        required: false
+        default: false
+        type: boolean
   repository_dispatch:
     types:
       - app-released
@@ -49,8 +54,23 @@ jobs:
           DEFAULT_IMAGE_REPOSITORY: ${{ env.DEFAULT_IMAGE_REPOSITORY }}
           RAW_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.event.client_payload.version }}
           RAW_IMAGE_REPOSITORY: ${{ github.event_name == 'workflow_dispatch' && inputs.image_repository || github.event.client_payload.image_repository }}
+          REPUBLISH_LAST_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.republish_last_version || 'false' }}
         run: |
-          version="${RAW_VERSION#v}"
+          republish=false
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$REPUBLISH_LAST_VERSION" = "true" ]; then
+            republish=true
+            latest_tag="$(git tag --sort=-version:refname | grep '^v' | head -n 1)"
+
+            if [ -z "$latest_tag" ]; then
+              echo "No release tags were found to republish."
+              exit 1
+            fi
+
+            version="${latest_tag#v}"
+          else
+            version="${RAW_VERSION#v}"
+          fi
+
           image_repository="$RAW_IMAGE_REPOSITORY"
 
           if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
@@ -71,12 +91,18 @@ jobs:
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
           echo "image_repository=$image_repository" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "republish=$republish" >> "$GITHUB_OUTPUT"
 
       - name: Capture target branch
         id: branch
         run: echo "name=$(git branch --show-current)" >> "$GITHUB_OUTPUT"
 
+      - name: Republish release mode
+        if: ${{ steps.release.outputs.republish == 'true' }}
+        run: echo "Republishing ${{ steps.release.outputs.tag }} into gh-pages."
+
       - name: Fail if the release tag already exists
+        if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           TAG_NAME: ${{ steps.release.outputs.tag }}
         run: |
@@ -87,7 +113,14 @@ jobs:
             exit 1
           fi
 
+      - name: Check out latest release tag
+        if: ${{ steps.release.outputs.republish == 'true' }}
+        env:
+          TAG_NAME: ${{ steps.release.outputs.tag }}
+        run: git checkout "$TAG_NAME"
+
       - name: Update release files
+        if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: |
@@ -115,17 +148,21 @@ jobs:
         uses: azure/setup-helm@v4.3.1
 
       - name: Install helm-unittest plugin
+        if: ${{ steps.release.outputs.republish != 'true' }}
         run: helm plugin install https://github.com/helm-unittest/helm-unittest --verify=false
 
       - name: Set up chart-testing
+        if: ${{ steps.release.outputs.republish != 'true' }}
         uses: helm/chart-testing-action@v2.7.0
 
       - name: Create kind cluster
+        if: ${{ steps.release.outputs.republish != 'true' }}
         uses: helm/kind-action@v1.14.0
         with:
           cluster_name: chart-release
 
       - name: Prepare release values
+        if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
           VERSION: ${{ steps.release.outputs.version }}
@@ -152,6 +189,7 @@ jobs:
           PY
 
       - name: Log in to GitHub Container Registry
+        if: ${{ steps.release.outputs.republish != 'true' }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -159,27 +197,33 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull application image
+        if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
           VERSION: ${{ steps.release.outputs.version }}
         run: docker pull "${IMAGE_REPOSITORY}:${VERSION}"
 
       - name: Load image into kind
+        if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
           VERSION: ${{ steps.release.outputs.version }}
         run: kind load docker-image "${IMAGE_REPOSITORY}:${VERSION}" --name chart-release
 
       - name: Run helm-unittest suite
+        if: ${{ steps.release.outputs.republish != 'true' }}
         run: helm unittest .
 
       - name: Run chart-testing lint
+        if: ${{ steps.release.outputs.republish != 'true' }}
         run: ct lint --config ct.yaml --charts .
 
       - name: Run chart-testing install
+        if: ${{ steps.release.outputs.republish != 'true' }}
         run: ct install --config ct.yaml --charts .
 
       - name: Run helm test
+        if: ${{ steps.release.outputs.republish != 'true' }}
         run: |
           helm install clue-arena . \
             --namespace clue-arena-release \
@@ -190,16 +234,19 @@ jobs:
           helm test clue-arena --namespace clue-arena-release --logs --timeout 5m
 
       - name: Package chart
+        if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           VERSION: ${{ steps.release.outputs.version }}
         run: helm package . --destination dist
 
       - name: Configure git identity
+        if: ${{ steps.release.outputs.republish != 'true' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Commit release version
+        if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           VERSION: ${{ steps.release.outputs.version }}
           TAG_NAME: ${{ steps.release.outputs.tag }}
@@ -209,6 +256,7 @@ jobs:
           git tag "$TAG_NAME"
 
       - name: Push release commit and tag
+        if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           BRANCH_NAME: ${{ steps.branch.outputs.name }}
           TAG_NAME: ${{ steps.release.outputs.tag }}
@@ -216,7 +264,20 @@ jobs:
           git push origin "HEAD:$BRANCH_NAME"
           git push origin "$TAG_NAME"
 
+      - name: Publish Helm chart repository
+        uses: helm/chart-releaser-action@v1.7.0
+        with:
+          skip_packaging: ${{ steps.release.outputs.republish == 'true' }}
+          skip_existing: true
+          skip_upload: ${{ steps.release.outputs.republish == 'true' }}
+          packages_with_index: true
+          pages_branch: gh-pages
+        env:
+          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CR_PACKAGE_PATH: dist
+
       - name: Create GitHub release
+        if: ${{ steps.release.outputs.republish != 'true' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag }}

@@ -192,4 +192,6 @@ It supports two entry points:
 - Manual `workflow_dispatch`, where you provide the release version and optionally the application image repository.
 - Automatic `repository_dispatch` from the app repository after a successful application release.
 
+The manual dispatch also supports `republish_last_version=true`, which republishes the latest released chart into `gh-pages` without creating a new tag or GitHub Release. This is useful for reconciling the Helm repository metadata when the chart release already exists.
+
 During a chart release, the workflow updates `Chart.yaml` to the requested version, validates the chart against the released application image, packages the chart, tags the repository, and creates a GitHub Release with the packaged chart attached.
