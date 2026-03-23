@@ -273,14 +273,12 @@ jobs:
       - name: Publish Helm chart repository
         uses: helm/chart-releaser-action@v1.7.0
         with:
-          skip_packaging: ${{ steps.release.outputs.republish == 'true' }}
+          charts_dir: .
           skip_existing: true
-          skip_upload: ${{ steps.release.outputs.republish == 'true' }}
           packages_with_index: true
           pages_branch: gh-pages
         env:
           CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CR_PACKAGE_PATH: dist
 
       - name: Create GitHub release
         if: ${{ steps.release.outputs.republish != 'true' }}
