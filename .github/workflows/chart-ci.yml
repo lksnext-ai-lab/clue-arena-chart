@@ -26,13 +26,13 @@ jobs:
         run: helm plugin install https://github.com/helm-unittest/helm-unittest --verify=false
 
       - name: Run helm-unittest suite
-        run: helm unittest .
+        run: helm unittest charts/clue-arena-app
 
       - name: Set up chart-testing
         uses: helm/chart-testing-action@v2.7.0
 
       - name: Run chart-testing lint
-        run: ct lint --config ct.yaml --charts .
+        run: ct lint --config ct.yaml --charts charts/clue-arena-app
 
   install:
     name: Install In Kind
@@ -74,7 +74,7 @@ jobs:
         run: kind load docker-image ghcr.io/${{ github.repository_owner }}/clue-arena:dev --name chart-testing
 
       - name: Run chart-testing install
-        run: ct install --config ct.yaml --charts .
+        run: ct install --config ct.yaml --charts charts/clue-arena-app
 
       - name: Dump cluster state on failure
         if: failure()
@@ -120,7 +120,7 @@ jobs:
 
       - name: Install chart and wait for rollout
         run: |
-          helm install clue-arena . \
+          helm install clue-arena charts/clue-arena-app \
             --namespace clue-arena-ci \
             --create-namespace \
             --values ci/ct-values.yaml \
