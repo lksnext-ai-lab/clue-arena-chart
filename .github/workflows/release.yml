@@ -33,7 +33,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: read
     env:
       DEFAULT_IMAGE_REPOSITORY: ghcr.io/${{ github.repository_owner }}/clue-arena
     steps:
@@ -188,7 +187,7 @@ jobs:
           image_repository = os.environ["IMAGE_REPOSITORY"]
           app_version = os.environ["APP_VERSION"]
 
-          values = Path("ci/ct-values.yaml")
+          values = Path("charts/clue-arena-app/ci/ct-values.yaml")
           lines = values.read_text().splitlines()
           output = []
           for line in lines:
@@ -201,28 +200,6 @@ jobs:
               output.append(line)
           values.write_text("\n".join(output) + "\n")
           PY
-
-      - name: Log in to GitHub Container Registry
-        if: ${{ steps.release.outputs.republish != 'true' }}
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Pull application image
-        if: ${{ steps.release.outputs.republish != 'true' }}
-        env:
-          IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
-          APP_VERSION: ${{ steps.release.outputs.app_version }}
-        run: docker pull "${IMAGE_REPOSITORY}:${APP_VERSION}"
-
-      - name: Load image into kind
-        if: ${{ steps.release.outputs.republish != 'true' }}
-        env:
-          IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
-          APP_VERSION: ${{ steps.release.outputs.app_version }}
-        run: kind load docker-image "${IMAGE_REPOSITORY}:${APP_VERSION}" --name chart-release
 
       - name: Run helm-unittest suite
         if: ${{ steps.release.outputs.republish != 'true' }}
@@ -242,7 +219,7 @@ jobs:
           helm install clue-arena charts/clue-arena-app \
             --namespace clue-arena-release \
             --create-namespace \
-            --values ci/ct-values.yaml \
+            --values charts/clue-arena-app/ci/ct-values.yaml \
             --wait \
             --timeout 5m
           helm test clue-arena --namespace clue-arena-release --logs --timeout 5m
