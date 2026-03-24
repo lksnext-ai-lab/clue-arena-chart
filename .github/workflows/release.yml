@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version in semver format, for example 1.2.3
+        description: Chart release version in semver format, for example 1.2.3
+        required: false
+        type: string
+      app_version:
+        description: Application (docker image) version to package into the chart. Defaults to the chart version if omitted.
         required: false
         type: string
       image_repository:
@@ -53,6 +57,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           DEFAULT_IMAGE_REPOSITORY: ${{ env.DEFAULT_IMAGE_REPOSITORY }}
           RAW_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.event.client_payload.version }}
+          RAW_APP_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.app_version || github.event.client_payload.app_version }}
           RAW_IMAGE_REPOSITORY: ${{ github.event_name == 'workflow_dispatch' && inputs.image_repository || github.event.client_payload.image_repository }}
           REPUBLISH_LAST_VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.republish_last_version || 'false' }}
         run: |
@@ -69,6 +74,12 @@ jobs:
             version="${latest_tag#v}"
           else
             version="${RAW_VERSION#v}"
+          fi
+
+          # app_version defaults to chart version when not supplied
+          app_version="${RAW_APP_VERSION#v}"
+          if [ -z "$app_version" ]; then
+            app_version="$version"
           fi
 
           image_repository="$RAW_IMAGE_REPOSITORY"
@@ -88,6 +99,7 @@ jobs:
           fi
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "app_version=$app_version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
           echo "image_repository=$image_repository" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
@@ -123,6 +135,7 @@ jobs:
         if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           VERSION: ${{ steps.release.outputs.version }}
+          APP_VERSION: ${{ steps.release.outputs.app_version }}
         run: |
           python <<'PY'
           import os
@@ -130,17 +143,18 @@ jobs:
           from pathlib import Path
 
           version = os.environ["VERSION"]
+          app_version = os.environ["APP_VERSION"]
 
           chart = Path("charts/clue-arena-app/Chart.yaml")
           chart_text = chart.read_text()
           chart_text = re.sub(r"^version: .*$", f"version: {version}", chart_text, count=1, flags=re.MULTILINE)
-          chart_text = re.sub(r'^appVersion: ".*"$', f'appVersion: "{version}"', chart_text, count=1, flags=re.MULTILINE)
+          chart_text = re.sub(r'^appVersion: ".*"$', f'appVersion: "{app_version}"', chart_text, count=1, flags=re.MULTILINE)
           chart.write_text(chart_text)
 
           readme = Path("README.md")
           readme_text = readme.read_text()
           readme_text = re.sub(r"- Chart version: `[^`]+`", f"- Chart version: `{version}`", readme_text, count=1)
-          readme_text = re.sub(r"- App version: `[^`]+`", f"- App version: `{version}`", readme_text, count=1)
+          readme_text = re.sub(r"- App version: `[^`]+`", f"- App version: `{app_version}`", readme_text, count=1)
           readme.write_text(readme_text)
           PY
 
@@ -165,14 +179,14 @@ jobs:
         if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
-          VERSION: ${{ steps.release.outputs.version }}
+          APP_VERSION: ${{ steps.release.outputs.app_version }}
         run: |
           python <<'PY'
           import os
           from pathlib import Path
 
           image_repository = os.environ["IMAGE_REPOSITORY"]
-          version = os.environ["VERSION"]
+          app_version = os.environ["APP_VERSION"]
 
           values = Path("ci/ct-values.yaml")
           lines = values.read_text().splitlines()
@@ -182,7 +196,7 @@ jobs:
             if stripped.startswith("repository:"):
               output.append(f"  repository: {image_repository}")
             elif stripped.startswith("tag:"):
-              output.append(f"  tag: {version}")
+              output.append(f"  tag: {app_version}")
             else:
               output.append(line)
           values.write_text("\n".join(output) + "\n")
@@ -200,15 +214,15 @@ jobs:
         if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
-          VERSION: ${{ steps.release.outputs.version }}
-        run: docker pull "${IMAGE_REPOSITORY}:${VERSION}"
+          APP_VERSION: ${{ steps.release.outputs.app_version }}
+        run: docker pull "${IMAGE_REPOSITORY}:${APP_VERSION}"
 
       - name: Load image into kind
         if: ${{ steps.release.outputs.republish != 'true' }}
         env:
           IMAGE_REPOSITORY: ${{ steps.release.outputs.image_repository }}
-          VERSION: ${{ steps.release.outputs.version }}
-        run: kind load docker-image "${IMAGE_REPOSITORY}:${VERSION}" --name chart-release
+          APP_VERSION: ${{ steps.release.outputs.app_version }}
+        run: kind load docker-image "${IMAGE_REPOSITORY}:${APP_VERSION}" --name chart-release
 
       - name: Run helm-unittest suite
         if: ${{ steps.release.outputs.republish != 'true' }}
