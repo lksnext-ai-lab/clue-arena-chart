@@ -8,6 +8,4 @@
   echo "Visit http://127.0.0.1:3000"
 {{- end }}
 
-2. Verify that your image was built with the same NEXT_PUBLIC_* values you expect in production.
-
-3. If you keep SQLite enabled, stay on a single writable replica unless you redesign persistence.
+2. If you keep SQLite enabled, stay on a single writable replica unless you redesign persistence.
