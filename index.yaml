@@ -3,6 +3,16 @@ entries:
   clue-arena-app:
   - apiVersion: v2
     appVersion: 1.0.2
+    created: "2026-03-25T15:18:14.459656412Z"
+    description: Helm chart for deploying the Clue Arena application on Kubernetes.
+    digest: 5810b5d83833c74b487e1e93319f86c71cb41b4adfc6efa51cbb30b61dba6f2b
+    name: clue-arena-app
+    type: application
+    urls:
+    - clue-arena-app-1.0.5.tgz
+    version: 1.0.5
+  - apiVersion: v2
+    appVersion: 1.0.2
     created: "2026-03-25T13:30:00.371145616Z"
     description: Helm chart for deploying the Clue Arena application on Kubernetes.
     digest: 9e4346ce30a473cbb68a1d3deaaa5a4bfd571cdda1ecdd2686939783cbad7dc5
@@ -31,4 +41,4 @@ entries:
     urls:
     - clue-arena-app-1.0.2.tgz
     version: 1.0.2
-generated: "2026-03-25T13:30:00.371164511Z"
+generated: "2026-03-25T15:18:14.459675037Z"
