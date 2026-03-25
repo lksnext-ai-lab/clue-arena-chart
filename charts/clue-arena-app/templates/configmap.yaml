@@ -13,6 +13,7 @@ data:
   NEXT_PUBLIC_DISABLE_AUTH: {{ .Values.app.auth.disableAuth | quote }}
   DEMO_MODE: {{ .Values.app.auth.demoMode | quote }}
   AUTH_TRUST_HOST: {{ .Values.app.auth.trustHost | quote }}
+  AUTH_URL: {{ include "clue-arena-app.publicUrl" . | quote }}
   NEXT_PUBLIC_FIREBASE_AUTH_PROVIDER: {{ .Values.app.auth.firebaseAuthProviders | quote }}
   NEXT_PUBLIC_FIREBASE_API_KEY: {{ .Values.app.auth.firebaseClient.apiKey | quote }}
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: {{ .Values.app.auth.firebaseClient.authDomain | quote }}
