@@ -26,6 +26,12 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].volumeMounts[0].mountPath
           value: /app/data
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].mountPath
+          value: /app/public/avatars
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].subPath
+          value: avatars
 
   - it: omits persistence resources when database persistence is disabled
     set:
