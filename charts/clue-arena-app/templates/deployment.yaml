@@ -13,6 +13,9 @@ spec:
       {{- include "clue-arena-app.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      annotations:
+        checksum/config: {{ .Values.app | toYaml | sha256sum }}
+        checksum/exposure: {{ .Values.exposure | toYaml | sha256sum }}
       labels:
         {{- include "clue-arena-app.selectorLabels" . | nindent 8 }}
     spec:
