@@ -16,7 +16,7 @@ tests:
           value: RELEASE-NAME-clue-arena-app
       - equal:
           path: spec.template.spec.containers[0].image
-          value: ghcr.io/your-org/clue-arena:0.1.0
+          value: ghcr.io/lksnext-ai-lab/clue-arena:0.1.0
       - equal:
           path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
           value: RELEASE-NAME-clue-arena-app-config
