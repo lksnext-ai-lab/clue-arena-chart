@@ -16,6 +16,9 @@ spec:
       annotations:
         checksum/config: {{ .Values.app | toYaml | sha256sum }}
         checksum/exposure: {{ .Values.exposure | toYaml | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       labels:
         {{- include "clue-arena-app.selectorLabels" . | nindent 8 }}
     spec:

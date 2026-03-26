@@ -58,3 +58,11 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].envFrom[1].secretRef.name
           value: RELEASE-NAME-clue-arena-app-secret
+
+  - it: adds custom pod annotations when configured
+    set:
+      podAnnotations.restartedAt: "2026-03-26T10:00:00Z"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.restartedAt
+          value: "2026-03-26T10:00:00Z"

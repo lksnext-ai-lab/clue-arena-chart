@@ -7,6 +7,9 @@ image:
   # Kubernetes pull policy for the app image.
   pullPolicy: IfNotPresent
 
+# Extra annotations to add to the application pods.
+podAnnotations: {}
+
 # Public access settings for the application.
 exposure:
   # Set to true to create an Ingress.
