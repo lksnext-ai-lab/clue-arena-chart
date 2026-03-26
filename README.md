@@ -8,7 +8,7 @@ while the templates keep the Kubernetes wiring inside the chart.
 ## Chart summary
 
 - Chart name: `clue-arena-app`
-- Chart version: `1.0.6`
+- Chart version: `1.0.7`
 - App version: `1.0.3`
 - Container port: `3000`
 
